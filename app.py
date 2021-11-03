@@ -32,6 +32,11 @@ def read_database():
 
     return storage_file
 
+# Write content to database file
+def write_database(storage_file):
+    with open("db.json", "w") as file:
+        json.dump(storage_file, file, indent = 4, sort_keys=True)
+
 
 # Creates headers for the response
 def create_headers(status_code: int, status_text: str, message_body=""):
@@ -98,24 +103,31 @@ def client_thread(client_socket, ip, port):
 
     # Listen to incomming data
     data = receive_data(client_socket)
+    print(data)
 
     if data:
 
         if data[0] == "GET":
             response_headers = do_GET(data)
 
-        print(data)
-        # response_headers = create_headers(200, 'OK')
+        if data[0] == "POST":
+            response_headers = do_POST(data)
+
+        if data[0] == "PUT":
+            response_headers = do_PUT(data)
+
+        if data[0] == "DELETE":
+            response_headers = do_DELETE(data)
+
+
         client_socket.send(response_headers)
         client_socket.close()
         print(f"Connection from {ip}:{port} has been closed.")
 
     print(f"Client thread for {ip}:{port} has been closed.")
 
-
-# Handle GET request
-def do_GET(data: list):
-
+def get_content(data: list):
+    
     # Check for content length
     if "Content-Length:" in data:
         con_len_index = data.index("Content-Length:")
@@ -123,31 +135,90 @@ def do_GET(data: list):
 
         # If there is no actual content
         if con_len_value == "0":
-            return create_headers(400, "Bad Request")
+            return None
     else:
-        return create_headers(400, "Bad Request")
+        return None
 
     # Check for content type
     if "Content-Type:" not in data:
-        return create_headers(400, "Bad Request")
+        return None
 
-    # Get query param
-    query = data[con_len_index + 2]
+    # Return content 
+    return data[con_len_index + 2]
+
+# Handle GET request
+def do_GET(data: list):
+
+    content = get_content(data)
+    if content == None:
+        return create_headers(400, "Bad Request")
 
     storage_data = read_database()
 
-    if query in storage_data:
-        value = storage_data.get(query)
+    if content in storage_data:
+        value = storage_data.get(content)
         return create_headers(200, "OK", value)
     else:
         return create_headers(404, "Not Found")
+
+# Handle POST request
+def do_POST(data: list):
+
+    content = get_content(data)
+    if content == None:
+        return create_headers(400, "Bad Request")
+
+    storage_data = read_database()
+
+    if content in storage_data:
+        return create_headers(409, "Conflict")
+    else:
+        storage_data[content] = ""
+        write_database(storage_data)
+        return create_headers(201, "Created")
+
+# Handle PUT request
+def do_PUT(data: list):
+
+    content = get_content(data)
+    if content == None:
+        return create_headers(400, "Bad Request")
+
+    storage_data = read_database()
+
+    content_dict = json.loads(content)
+    content_key = list(content_dict.keys())[0]
+
+    if content_key in storage_data:
+        storage_data.update(content_dict)
+        write_database(storage_data)
+        return create_headers(200, "OK")
+    else:
+        return create_headers(404, "Not Found")
+
+# Handle DELETE request
+def do_DELETE(data: list):
+
+    content = get_content(data)
+    if content == None:
+        return create_headers(400, "Bad Request")
+
+    storage_data = read_database()
+
+    if content in storage_data:
+        storage_data.pop(content)
+        write_database(storage_data)
+        return create_headers(200, "OK")
+    else:
+        return create_headers(404, "Not Found")
+
 
 
 # Receive & process data
 def receive_data(client_socket):
     client_data = client_socket.recv(MAX_BUFFER_SIZE)
     decoded_data = (
-        str(client_data).strip("b'").rstrip().replace("\\n", " ").replace("\\r", " ")
+        str(client_data).strip("b'").rstrip().replace("\\n", "").replace("\\r", " ").replace("\\t", "")
     )
     data_variables = str(decoded_data).split()
 
