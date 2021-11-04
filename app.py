@@ -144,7 +144,7 @@ def get_content(data: list):
         return None
 
     # Return content 
-    return data[con_len_index + 2]
+    return data[-1]
 
 # Handle GET request
 def do_GET(data: list):
