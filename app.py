@@ -47,18 +47,25 @@ def create_headers(status_code: int, status_text: str, message_body=""):
     response_status_text = status_text
     response_content_type = "application/json; encoding=utf8"
     response_connection = "close"
+    response_content_length = str(len(message_body.encode('utf-8')))
 
     # Create response sections
     status_line = (
         f"{response_protocol} {response_status_code} {response_status_text}\r\n"
     )
-    content_type = f"Content-Type: {response_content_type}\r\n"
     connection = f"Connection: {response_connection}\r\n"
+    content_type = f"Content-Type: {response_content_type}\r\n"
+    content_length = f"Content-Length:  {response_content_length}\r\n"
     empty_line = f"\r\n"
 
     # Combine into single string
     response_header = (
-        status_line + content_type + connection + empty_line + message_body
+        status_line +
+        connection +
+        content_type +
+        content_length +
+        empty_line +
+        message_body
     )
 
     # Encode string to utf-8 bytes
@@ -86,7 +93,7 @@ def start_server():
 
     while True:
 
-        # Accept incoming connection
+        # Wait and accept incoming connection
         (client_socket, address) = server_socket.accept()
         ip, port = str(address[0]), str(address[1])
         print(f"Connection from {ip}:{port} has been established.")
@@ -126,6 +133,7 @@ def client_thread(client_socket, ip, port):
 
     print(f"Client thread for {ip}:{port} has been closed.")
 
+# Get content from request
 def get_content(data: list):
     
     # Check for content length
@@ -211,8 +219,6 @@ def do_DELETE(data: list):
         return create_headers(200, "OK")
     else:
         return create_headers(404, "Not Found")
-
-
 
 # Receive & process data
 def receive_data(client_socket):
